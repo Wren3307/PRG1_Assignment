@@ -58,8 +58,11 @@ def replenish_ore():
 def clear_fog(fog, player):
     px, py = player['x'], player['y']
     
-    for dy in range(-1, 2):
-        for dx in range(-1, 2):
+    #check if torch bought
+    view_range = 2 if player.get('has_torch', False) else 1
+    
+    for dy in range(-view_range, view_range + 1):
+        for dx in range(-view_range, view_range + 1):
             nx, ny = px + dx, py + dy
             if 0 <= nx < MAP_WIDTH and 0 <= ny < MAP_HEIGHT:
                 fog[ny][nx] = False
@@ -93,6 +96,7 @@ def initialize_game(game_map, fog, player):
     player['turns'] = TURNS_PER_DAY
     player['backpack_capacity'] = 10
     player['pickaxe_level'] = 1
+    player['has_torch'] = False
     
     clear_fog(fog, player)
     
@@ -113,14 +117,20 @@ def draw_map(game_map, fog, player):
         print("|")
     print("+------------------------------+")
 
-#3x3 player view
+#3x3 or 5x5 player view based on torch
 def draw_view(game_map, fog, player):
     px, py = player['x'], player['y']
     
-    print("+---+")
-    for dy in range(-1, 2):
+    #determine value
+    view_range = 2 if player.get('has_torch', False) else 1
+    view_size = 5 if player.get('has_torch', False) else 3
+    
+    border = "+" + "-" * view_size + "+"
+    print(border)
+    
+    for dy in range(-view_range, view_range + 1):
         print("|", end="")
-        for dx in range(-1, 2):
+        for dx in range(-view_range, view_range + 1):
             nx, ny = px + dx, py + dy
             if 0 <= nx < MAP_WIDTH and 0 <= ny < MAP_HEIGHT:
                 if dx == 0 and dy == 0:
@@ -133,7 +143,7 @@ def draw_view(game_map, fog, player):
             else:
                 print("#", end="")
         print("|")
-    print("+---+")
+    print(border)
 
 #display player info
 def show_information(player):
@@ -146,6 +156,9 @@ def show_information(player):
     
     pickaxe_type = ['copper', 'silver', 'gold'][min(player['pickaxe_level'] - 1, 2)]
     print(f"Pickaxe level: {player['pickaxe_level']} ({pickaxe_type})")
+    
+    torch_status = "Yes" if player.get('has_torch', False) else "No"
+    print(f"Magic torch: {torch_status}")
     
     if not player.get('in_town', False):
         print(f"Gold: {player['gold']}")
@@ -172,7 +185,7 @@ def save_top_score(player):
     } #add current player score
     scores.append(new_score)
 
-    scores.sort(key=lambda x: (x['days'], x['steps'], -x['gp']))#sort score based on quality of score
+    scores.sort(key=lambda x: (x['days'], x['steps'], -x['gp'])) #sort score based on quality of score
         
     scores = scores[:5] #only top 5 kept
         
@@ -236,6 +249,7 @@ def save_game(game_map, fog, player):
             f.write(f"{player['turns']}\n")
             f.write(f"{player['backpack_capacity']}\n")
             f.write(f"{player['pickaxe_level']}\n")
+            f.write(f"{player.get('has_torch', False)}\n")
             
             #save fog data
             for row in fog:
@@ -270,9 +284,16 @@ def load_game(game_map, fog, player):
             player['backpack_capacity'] = int(lines[8].strip())
             player['pickaxe_level'] = int(lines[9].strip())
             
+            #load torch status
+            if len(lines) > 10:
+                player['has_torch'] = lines[10].strip().lower() == 'true'
+            else:
+                player['has_torch'] = False
+            
             #load fog data
             fog.clear()
-            for i in range(10, 10 + MAP_HEIGHT):
+            fog_start = 11 if len(lines) > 10 else 10
+            for i in range(fog_start, fog_start + MAP_HEIGHT):
                 if i < len(lines):
                     row = [cell == '1' for cell in lines[i].strip().split(',')]
                     fog.append(row)
@@ -281,7 +302,8 @@ def load_game(game_map, fog, player):
             
             #load current map state
             game_map.clear()
-            for i in range(10 + MAP_HEIGHT, 10 + MAP_HEIGHT * 2):
+            map_start = fog_start + MAP_HEIGHT
+            for i in range(map_start, map_start + MAP_HEIGHT):
                 if i < len(lines):
                     row = lines[i].strip().split(',')
                     game_map.append(row)
@@ -328,6 +350,10 @@ def show_shop_menu(player):
     upgrade_price = capacity * 2
     new_capacity = capacity + 2
     print(f"(B)ackpack upgrade to carry {new_capacity} items for {upgrade_price} GP")
+    
+    #magic torch
+    if not player.get('has_torch', False):
+        print("(T)orch - Magic torch for 5x5 viewport for 50 GP")
     
     print("(L)eave shop")
     print("-----------------------------------------------------------")
@@ -444,7 +470,7 @@ def move_player(player, game_map, fog, direction):
         
         #mine
         if mine_ore(player, cell):
-            game_map[new_y][new_x] = ' '  # Remove ore after mining
+            game_map[new_y][new_x] = ' '  #remove ore, chenge to space after mining
             player['x'] = new_x
             player['y'] = new_y
             player['steps'] += 1
@@ -547,6 +573,15 @@ def main():
                             player['GP'] -= price
                             player['backpack_capacity'] += 2
                             print(f"Congratulations! You can now carry {player['backpack_capacity']} items!")
+                        else:
+                            print("You don't have enough GP!")
+                    
+                    elif shop_choice == 't' and not player.get('has_torch', False):
+                        torch_price = 50
+                        if player['GP'] >= torch_price:
+                            player['GP'] -= torch_price
+                            player['has_torch'] = True
+                            print("Congratulations! You now have a magic torch with 5x5 viewport!")
                         else:
                             print("You don't have enough GP!")
                             
