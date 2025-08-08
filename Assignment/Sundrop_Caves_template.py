@@ -6,8 +6,7 @@ import sys
 player = {}
 game_map = []
 fog = []
-original_map = []  # Store original map for replenishment
-
+original_map = []  #stores original map for replenish function
 MAP_WIDTH = 0
 MAP_HEIGHT = 0
 
@@ -52,7 +51,7 @@ def replenish_ore():
     for y in range(MAP_HEIGHT):
         for x in range(MAP_WIDTH):
             if original_map[y][x] in ['C', 'S', 'G'] and game_map[y][x] == ' ':
-                if randint(1, 100) <= 20:  # 20% chance
+                if randint(1, 100) <= 20:
                     game_map[y][x] = original_map[y][x]
 
 #clears fog around player
@@ -69,7 +68,6 @@ def initialize_game(game_map, fog, player):
 
     load_map(game_map)
     
-    # Store original map for replenishment
     original_map.clear()
     for row in game_map:
         original_map.append(row[:])
@@ -357,7 +355,7 @@ def sell_ore(player):
             print(msg)
         print(f"You now have {player['GP']} GP!")
     
-    # Replenish ore when returning to town
+    #replenishes ore when returning to town detected
     replenish_ore()
     
     return total_gp > 0
@@ -527,7 +525,7 @@ def main():
             os.system('cls')
             
             if choice == 'b':
-                # Shop
+                #shop
                 while True:
                     show_shop_menu(player)
                     shop_choice = input("Your choice? ").strip().lower()
@@ -598,7 +596,7 @@ def main():
                 player['turns'] -= 1
                 
                 if result == "town":
-                    # Returned to town
+                    #returned
                     sell_ore(player)
                     player['day'] += 1
                     player['in_town'] = True
@@ -618,7 +616,7 @@ def main():
                     game_state = 'town'
                     continue
                 
-                # Check if out of turns
+                #checks turns
                 if player['turns'] <= 0:
                     print("You are exhausted.")
                     print("You place your portal stone here and zap back to town.")
