@@ -6,6 +6,7 @@ import sys
 player = {}
 game_map = []
 fog = []
+original_map = []  # Store original map for replenishment
 
 MAP_WIDTH = 0
 MAP_HEIGHT = 0
@@ -47,6 +48,13 @@ def load_map(map_struct):
         MAP_WIDTH = 30
         MAP_HEIGHT = len(map_struct)
 
+def replenish_ore():
+    for y in range(MAP_HEIGHT):
+        for x in range(MAP_WIDTH):
+            if original_map[y][x] in ['C', 'S', 'G'] and game_map[y][x] == ' ':
+                if randint(1, 100) <= 20:  # 20% chance
+                    game_map[y][x] = original_map[y][x]
+
 #clears fog around player
 def clear_fog(fog, player):
     px, py = player['x'], player['y']
@@ -60,6 +68,11 @@ def clear_fog(fog, player):
 def initialize_game(game_map, fog, player):
 
     load_map(game_map)
+    
+    # Store original map for replenishment
+    original_map.clear()
+    for row in game_map:
+        original_map.append(row[:])
     
     #sets up fog
     fog.clear()
@@ -229,6 +242,10 @@ def save_game(game_map, fog, player):
             #save fog data
             for row in fog:
                 f.write(','.join('1' if cell else '0' for cell in row) + '\n')
+            
+            #save current map state
+            for row in game_map:
+                f.write(','.join(row) + '\n')
         
         print("Game saved.")
     except:
@@ -255,7 +272,7 @@ def load_game(game_map, fog, player):
             player['backpack_capacity'] = int(lines[8].strip())
             player['pickaxe_level'] = int(lines[9].strip())
             
-            #load data
+            #load fog data
             fog.clear()
             for i in range(10, 10 + MAP_HEIGHT):
                 if i < len(lines):
@@ -263,6 +280,13 @@ def load_game(game_map, fog, player):
                     fog.append(row)
                 else:
                     fog.append([True] * MAP_WIDTH)
+            
+            #load current map state
+            game_map.clear()
+            for i in range(10 + MAP_HEIGHT, 10 + MAP_HEIGHT * 2):
+                if i < len(lines):
+                    row = lines[i].strip().split(',')
+                    game_map.append(row)
         
         return True
     except:
@@ -332,6 +356,9 @@ def sell_ore(player):
         for msg in sales_messages:
             print(msg)
         print(f"You now have {player['GP']} GP!")
+    
+    # Replenish ore when returning to town
+    replenish_ore()
     
     return total_gp > 0
 
@@ -419,6 +446,7 @@ def move_player(player, game_map, fog, direction):
         
         #mine
         if mine_ore(player, cell):
+            game_map[new_y][new_x] = ' '  # Remove ore after mining
             player['x'] = new_x
             player['y'] = new_y
             player['steps'] += 1
